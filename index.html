@@ -59,6 +59,18 @@ button:hover { background: #2563eb; }
   align-items: center;
 }
 
+.school-header {
+  background: rgba(37, 99, 235, 0.3); /* Um azul um pouco mais forte para destacar a escola */
+  padding: 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: 0.2s;
+}
+.school-header:hover { background: rgba(37, 99, 235, 0.5); }
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -210,6 +222,9 @@ async function save(showAlert = false) {
   try {
     await fetch(WEB_APP_URL, {
       method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
       body: JSON.stringify({ action: "save", content: schools })
     });
     setStatus("✅ Salvo na nuvem com sucesso!", "#10b981");
@@ -227,6 +242,9 @@ async function load() {
   try {
     const response = await fetch(WEB_APP_URL, {
       method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
       body: JSON.stringify({ action: "load" })
     });
     const data = await response.json();
@@ -248,6 +266,8 @@ function addSchool() {
   if (!n.trim()) return;
   schools.push({ name: n.trim(), classes: [] });
   document.getElementById('schoolInput').value = '';
+  // Abre a escola automaticamente ao criá-la
+  openState[`school-${schools.length - 1}`] = true;
   render(); save();
 }
 
@@ -258,6 +278,8 @@ function addClass(s) {
     name: n.trim(), students: [], subjects: [], notes: {},
     month: new Date().getMonth(), year: new Date().getFullYear()
   });
+  // Abre a turma automaticamente ao criá-la
+  openState[`${s}-${schools[s].classes.length - 1}`] = true;
   render(); save();
 }
 
@@ -380,69 +402,82 @@ function render() {
   schools.forEach((school, s) => {
     const sDiv = document.createElement('div');
     sDiv.className = 'section';
-    sDiv.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-      <h2 style="margin:0;">${school.name}</h2>
-      <button onclick="addClass(${s})" style="background:#475569;">➕ Turma</button>
+    
+    // Controle de minimizar da Escola (por padrão começam abertas se for undefined)
+    const schoolKey = `school-${s}`;
+    let isSchoolOpen = openState[schoolKey];
+    if (isSchoolOpen === undefined) isSchoolOpen = true; 
+
+    // Cabecalho da escola clicável
+    sDiv.innerHTML = `<div class='school-header' style="margin-bottom: ${isSchoolOpen ? '15px' : '0'};" onclick="openState['${schoolKey}'] = ${!isSchoolOpen}; render();">
+      <h2 style="margin:0;">🏫 ${school.name}</h2>
+      <div>
+        <button onclick="event.stopPropagation(); addClass(${s})" style="background:#475569;">➕ Turma</button>
+        <span style="margin-left: 10px; font-size: 1.2em;">${isSchoolOpen ? '🔽' : '▶️'}</span>
+      </div>
     </div>`;
 
-    school.classes.forEach((cls, c) => {
-      const key = `${s}-${c}`;
-      const isOpen = openState[key];
-      const cDiv = document.createElement('div');
-      cDiv.className = 'section';
-      cDiv.style.background = 'rgba(0,0,0,0.15)';
+    // Só mostra as turmas se a escola estiver aberta
+    if (isSchoolOpen) {
+      school.classes.forEach((cls, c) => {
+        const key = `${s}-${c}`;
+        const isOpen = openState[key];
+        const cDiv = document.createElement('div');
+        cDiv.className = 'section';
+        cDiv.style.background = 'rgba(0,0,0,0.15)';
 
-      let html = `<div class='header' onclick="toggleOpen('${key}')">
-        <span style="font-weight:bold;">📚 Turma: ${cls.name}</span>
-        <span>${isOpen ? '🔽' : '▶️'}</span>
-      </div>`;
-
-      if (isOpen) {
-        html += `<div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
-          <select onchange="schools[${s}].classes[${c}].month=Number(this.value);render();save();">`;
-          const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-          for(let i=0; i<12; i++) html += `<option value="${i}" ${i==cls.month?'selected':''}>${meses[i]}</option>`;
-        html += `</select>
-          <button onclick="addSubject(${s},${c})" style="background:#8b5cf6;">➕ Disciplina</button>
-          <button onclick="addStudents(${s},${c})" style="background:#0ea5e9;">👨‍🎓 Alunos</button>
-          <button onclick="exportFullReport(${s},${c})" style="background:#f59e0b;">📊 Imprimir</button>
+        let html = `<div class='header' onclick="toggleOpen('${key}')">
+          <span style="font-weight:bold;">📚 Turma: ${cls.name}</span>
+          <span>${isOpen ? '🔽' : '▶️'}</span>
         </div>`;
 
-        if (cls.students.length > 0) {
-          const days = getDays(cls.month, cls.year);
-          html += `<div style="overflow-x:auto; margin-top:15px;"><table><thead><tr>
-            <th rowspan="2" style="min-width: 150px; text-align:left; padding-left:10px;">Alunos</th>
-            <th colspan="${days}">Frequência Diária</th>
-            <th colspan="${cls.subjects.length || 1}" style="background:#334155;">Disciplinas</th>
-          </tr><tr>`;
-          for(let d=1; d<=days; d++) {
-            const hn = cls.notes && cls.notes[d] ? 'has-note' : '';
-            html += `<th class="day-header" onclick="openModal(${s},${c},${d})"><span class="day-btn ${hn}">${d}</span></th>`;
-          }
-          cls.subjects.forEach(sub => html += `<th style="background:#475569;">${sub}</th>`);
-          if (cls.subjects.length === 0) html += `<th style="background:#475569;">-</th>`;
-          html += `</tr></thead><tbody>`;
+        if (isOpen) {
+          html += `<div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
+            <select onchange="schools[${s}].classes[${c}].month=Number(this.value);render();save();">`;
+            const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+            for(let i=0; i<12; i++) html += `<option value="${i}" ${i==cls.month?'selected':''}>${meses[i]}</option>`;
+          html += `</select>
+            <button onclick="addSubject(${s},${c})" style="background:#8b5cf6;">➕ Disciplina</button>
+            <button onclick="addStudents(${s},${c})" style="background:#0ea5e9;">👨‍🎓 Alunos</button>
+            <button onclick="exportFullReport(${s},${c})" style="background:#f59e0b;">📊 Imprimir</button>
+          </div>`;
 
-          cls.students.forEach((st, i) => {
-            html += `<tr><td style="text-align:left; padding-left:10px;" onclick="editStudentName(${s}, ${c}, ${i})">
-                <b>${st.name}</b> <span style="opacity:0.2;font-size:10px;">✏️</span>
-              </td>`;
+          if (cls.students.length > 0) {
+            const days = getDays(cls.month, cls.year);
+            html += `<div style="overflow-x:auto; margin-top:15px;"><table><thead><tr>
+              <th rowspan="2" style="min-width: 150px; text-align:left; padding-left:10px;">Alunos</th>
+              <th colspan="${days}">Frequência Diária</th>
+              <th colspan="${cls.subjects.length || 1}" style="background:#334155;">Disciplinas</th>
+            </tr><tr>`;
             for(let d=1; d<=days; d++) {
-              const f = st.absences?.[cls.month]?.[d];
-              html += `<td onclick="toggleAbsence(${s},${c},${i},${d})" style="color:${f?'red':'inherit'};font-weight:${f?'bold':'normal'}">${f?'F':''}</td>`;
+              const hn = cls.notes && cls.notes[d] ? 'has-note' : '';
+              html += `<th class="day-header" onclick="openModal(${s},${c},${d})"><span class="day-btn ${hn}">${d}</span></th>`;
             }
-            cls.subjects.forEach(sub => {
-              html += `<td style="background:#f1f5f9;"><input type="text" class="grade-input" value="${st.grades[sub] || ''}" onchange="updateGrade(${s},${c},${i},'${sub}',this.value)"></td>`;
+            cls.subjects.forEach(sub => html += `<th style="background:#475569;">${sub}</th>`);
+            if (cls.subjects.length === 0) html += `<th style="background:#475569;">-</th>`;
+            html += `</tr></thead><tbody>`;
+
+            cls.students.forEach((st, i) => {
+              html += `<tr><td style="text-align:left; padding-left:10px;" onclick="editStudentName(${s}, ${c}, ${i})">
+                  <b>${st.name}</b> <span style="opacity:0.2;font-size:10px;">✏️</span>
+                </td>`;
+              for(let d=1; d<=days; d++) {
+                const f = st.absences?.[cls.month]?.[d];
+                html += `<td onclick="toggleAbsence(${s},${c},${i},${d})" style="color:${f?'red':'inherit'};font-weight:${f?'bold':'normal'}">${f?'F':''}</td>`;
+              }
+              cls.subjects.forEach(sub => {
+                html += `<td style="background:#f1f5f9;"><input type="text" class="grade-input" value="${st.grades[sub] || ''}" onchange="updateGrade(${s},${c},${i},'${sub}',this.value)"></td>`;
+              });
+              if (cls.subjects.length === 0) html += `<td style="background:#f1f5f9;">-</td>`;
+              html += `</tr>`;
             });
-            if (cls.subjects.length === 0) html += `<td style="background:#f1f5f9;">-</td>`;
-            html += `</tr>`;
-          });
-          html += `</tbody></table></div>`;
+            html += `</tbody></table></div>`;
+          }
         }
-      }
-      cDiv.innerHTML = html;
-      sDiv.appendChild(cDiv);
-    });
+        cDiv.innerHTML = html;
+        sDiv.appendChild(cDiv);
+      });
+    }
     div.appendChild(sDiv);
   });
 }
