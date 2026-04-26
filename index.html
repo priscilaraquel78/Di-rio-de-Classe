@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diário de Classe Pro (Cloud)</title>
+<style>
+/* Mantendo o seu estilo original escuro e responsivo */
+body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: linear-gradient(135deg, #0f172a, #1e3a8a); color: #fff; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+h1 { text-align: center; }
+input, select, textarea { padding: 8px; border-radius: 8px; border: none; outline: none; font-family: inherit; }
+button { margin: 5px; padding: 10px 16px; border-radius: 8px; border: none; background: #3b82f6; color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s; }
+button:hover { background: #2563eb; }
+.section { background: rgba(255, 255, 255, .08); border-radius: 12px; margin-bottom: 15px; padding: 15px; border: 1px solid rgba(255,255,255,0.1); }
+.header { background: rgba(255, 255, 255, .15); padding: 12px 15px; border-radius: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; background: #fff; color: #000; border-radius: 8px; overflow: hidden; }
+th { background: #1e40af; color: #fff; padding: 8px 4px; font-size: 12px; }
+th, td { border: 1px solid #e2e8f0; text-align: center; }
+td { padding: 5px; cursor: pointer; }
+.grade-input { width: 45px; text-align: center; border: 1px solid #cbd5e1 !important; font-weight: bold; }
+.day-btn.has-note { background: #10b981; color: #fff; border: 1px solid #059669; }
+.support-section { margin-top: auto; padding: 40px 0 20px; text-align: center; }
+.support-btn { background: #009ee3; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>📘 Diário de Classe Pro</h1>
+
+<div style="text-align: center; margin-bottom: 10px;">
+  <input id="schoolInput" placeholder="🏫 Nome da escola" onkeypress="if(event.key === 'Enter') addSchool()">
+  <button onclick="addSchool()">➕ Escola</button>
+  <button onclick="manualSave()" style="background: #10b981;">☁️ Sincronizar</button>
+</div>
+<div id="syncStatus" style="text-align: center; font-size: 14px; margin-bottom: 20px; color: #cbd5e1;"></div>
+
+<div id="schools"></div>
+
+<div class="support-section">
+  <p>Gosta do projeto? Ajude a mantê-lo! ❤️</p>
+  <a href="https://mpago.la/25RuJm4" target="_blank" class="support-btn">🤝 Contribuir com R$ 4,90</a>
+</div>
+
+<script>
+// INSIRA O SEU LINK AQUI
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvJkShNc1A2Rc9QVnQ2yPxZfyHSOUZHSDNqGwBaEcn0Y2r-7tVDyrpikqXrzCITb2Skg/exec";
+
+let schools = [];
+let openState = {};
+
+async function save() {
+    document.getElementById('syncStatus').innerText = "🔄 Sincronizando...";
+    try {
+        await fetch(WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: JSON.stringify({ action: "save", content: schools })
+        });
+        document.getElementById('syncStatus').innerText = "✅ Sincronizado!";
+    } catch (e) {
+        document.getElementById('syncStatus').innerText = "❌ Erro ao sincronizar.";
+    }
+}
+
+async function load() {
+    document.getElementById('syncStatus').innerText = "🔄 Carregando dados...";
+    try {
+        const response = await fetch(WEB_APP_URL);
+        const data = await response.json();
+        if (Array.isArray(data)) {
+            schools = data;
+            render();
+            document.getElementById('syncStatus').innerText = "✅ Dados carregados!";
+        }
+    } catch (e) {
+        document.getElementById('syncStatus').innerText = "⚠️ Modo Offline";
+        render();
+    }
+}
+
+function addSchool() {
+    const n = document.getElementById('schoolInput').value;
+    if (!n.trim()) return;
+    schools.push({ name: n.trim(), classes: [] });
+    document.getElementById('schoolInput').value = '';
+    render(); save();
+}
+
+// ... (Restantes funções de addClass, addStudents, render, etc., permanecem iguais às anteriores) ...
+// Nota: Certifique-se de incluir as funções de renderização completas aqui para o funcionamento total.
+
+load();
+</script>
+</body>
+</html>
